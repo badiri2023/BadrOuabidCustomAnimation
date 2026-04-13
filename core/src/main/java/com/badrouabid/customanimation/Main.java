@@ -4,30 +4,39 @@ import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.utils.viewport.ExtendViewport;
+import com.badlogic.gdx.utils.viewport.Viewport;
 
 public class Main extends ApplicationAdapter {
+
+    private static final float MIN_VIRTUAL_WIDTH = 800;
+    private static final float MIN_VIRTUAL_HEIGHT = 480;
 
     Animation<TextureRegion> slimeCaminar;
     Texture slimeSheet;
     float stateTime;
     boolean mirandoIzquierda = false;
     boolean moviendose = false;
-
     Texture textureFondo;
     TextureRegion regionFondo;
-
     float posicionMapaX = 0;
     float posicionMapaY = 0;
-
     SpriteBatch spriteBatch;
+
+    OrthographicCamera camera;
+    Viewport viewport;
 
     @Override
     public void create() {
         spriteBatch = new SpriteBatch();
+
+        camera = new OrthographicCamera();
+        viewport = new ExtendViewport(MIN_VIRTUAL_WIDTH, MIN_VIRTUAL_HEIGHT, camera);
 
         textureFondo = new Texture(Gdx.files.internal("forest-map.jpg"));
         textureFondo.setWrap(Texture.TextureWrap.MirroredRepeat, Texture.TextureWrap.MirroredRepeat);
@@ -37,10 +46,8 @@ public class Main extends ApplicationAdapter {
 
         int anchoFrame = slimeSheet.getWidth() / 5;
         int altoFrame = slimeSheet.getHeight() / 2;
-
         TextureRegion[][] tmp = TextureRegion.split(slimeSheet, anchoFrame, altoFrame);
 
-        // selecionamos la animacionq ue queremos realizar en concreto, la segunda fila
         TextureRegion[] framesCaminar = new TextureRegion[5];
         framesCaminar[0] = tmp[1][0];
         framesCaminar[1] = tmp[1][1];
@@ -48,17 +55,23 @@ public class Main extends ApplicationAdapter {
         framesCaminar[3] = tmp[1][3];
         framesCaminar[4] = tmp[1][4];
 
-        // Ajustamos la velocidad (0.08f suele quedar muy fluido para 5 frames)
         slimeCaminar = new Animation<TextureRegion>(0.08f, framesCaminar);
         stateTime = 0f;
     }
 
     @Override
+    public void resize(int width, int height) {
+        viewport.update(width, height, true);
+    }
+
+    @Override
     public void render() {
+        Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
+        float delta = Gdx.graphics.getDeltaTime();
         moviendose = false;
-        float velocidad = 200 * Gdx.graphics.getDeltaTime();
+        float velocidad = 200 * delta;
 
         // Movimiento
         if (Gdx.input.isKeyPressed(Input.Keys.RIGHT)) {
@@ -79,19 +92,24 @@ public class Main extends ApplicationAdapter {
             moviendose = true;
         }
 
-        regionFondo.setRegion((int)posicionMapaX, (int)posicionMapaY, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        float anchoMundo = viewport.getWorldWidth();
+        float altoMundo = viewport.getWorldHeight();
+        regionFondo.setRegion((int)posicionMapaX, (int)posicionMapaY, (int)anchoMundo, (int)altoMundo);
 
         if (moviendose) {
-            stateTime += Gdx.graphics.getDeltaTime();
+            stateTime += delta;
         } else {
             stateTime = 0f;
         }
 
         TextureRegion currentFrame = slimeCaminar.getKeyFrame(stateTime, true);
 
+        camera.update();
+        spriteBatch.setProjectionMatrix(camera.combined);
+
         spriteBatch.begin();
 
-        spriteBatch.draw(regionFondo, 0, 0);
+        spriteBatch.draw(regionFondo, 0, 0, anchoMundo, altoMundo);
 
         float anchoOriginal = currentFrame.getRegionWidth();
         float altoOriginal = currentFrame.getRegionHeight();
@@ -101,8 +119,8 @@ public class Main extends ApplicationAdapter {
         float escalaX = mirandoIzquierda ? -3.0f : 3.0f;
         float escalaY = 3.0f;
 
-        float posX = (Gdx.graphics.getWidth() / 2f) - origenX;
-        float posY = (Gdx.graphics.getHeight() / 2f) - origenY;
+        float posX = (anchoMundo / 2f) - origenX;
+        float posY = (altoMundo / 2f) - origenY;
 
         spriteBatch.draw(currentFrame,
             posX, posY,
